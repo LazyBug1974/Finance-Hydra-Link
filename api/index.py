@@ -2,21 +2,22 @@ from flask import Flask, request, Response
 import cloudscraper
 from bs4 import BeautifulSoup
 from datetime import datetime
+import time
 
 app = Flask(__name__)
 
-# 嚴格對齊標的映射表與指定的 Historical Data 路徑
+# 嚴格對齊標的映射表
 TARGET_MAP = {
-    "SPXF": "indices/us-spx-500-futures-historical-data", # 美國標普500指數期貨
-    "SOX": "indices/phlx-semiconductor-historical-data", # 費城半導體指數
-    "XAU": "currencies/xau-usd-historical-data", # 黃金現貨美元
-    "XAG": "currencies/xag-usd-historical-data", # 白銀現貨美元
-    "HGH6": "commodities/copper-historical-data", # 銅期貨
-    "WTI": "commodities/crude-oil-historical-data", # 西德州原油
-    "US30Y": "rates-bonds/u.s.-30-year-bond-yield-historical-data", # 美國 30Y 公債殖利率
-    "US20Y": "rates-bonds/us-20-year-bond-yield-historical-data", # 美國 20Y 公債殖利率
-    "US10Y": "rates-bonds/u.s.-10-year-bond-yield-historical-data", # 美國 10Y 公債殖利率
-    "US2Y": "rates-bonds/u.s.-2-year-bond-yield-historical-data" # 美國 2Y 公債殖利率
+    "SPXF": "indices/us-spx-500-futures-historical-data",
+    "SOX": "indices/phlx-semiconductor-historical-data",
+    "XAU": "currencies/xau-usd-historical-data",
+    "XAG": "currencies/xag-usd-historical-data",
+    "HGH6": "commodities/copper-historical-data",
+    "WTI": "commodities/crude-oil-historical-data",
+    "US30Y": "rates-bonds/u.s.-30-year-bond-yield-historical-data",
+    "US20Y": "rates-bonds/us-20-year-bond-yield-historical-data",
+    "US10Y": "rates-bonds/u.s.-10-year-bond-yield-historical-data",
+    "US2Y": "rates-bonds/u.s.-2-year-bond-yield-historical-data"
 }
 
 def get_investing_data(symbol):
@@ -24,28 +25,49 @@ def get_investing_data(symbol):
         return f"Error: Symbol {symbol} not found"
     
     url = f"https://www.investing.com/{TARGET_MAP[symbol]}"
+    
+    # 強制使用更強大的模擬瀏覽器設定
     scraper = cloudscraper.create_scraper(
-        browser={'browser': 'chrome', 'platform': 'windows', 'mobile': False}
+        browser={
+            'browser': 'chrome',
+            'platform': 'windows',
+            'desktop': True
+        }
     )
     
     try:
-        response = scraper.get(url, timeout=15)
+        # 增加自定義 Headers 模擬真實存取
+        headers = {
+            'Accept-Language': 'en-US,en;q=0.9',
+            'Referer': 'https://www.google.com/'
+        }
+        
+        response = scraper.get(url, headers=headers, timeout=20)
+        
         if response.status_code != 200:
-            return f"Error: HTTP {response.status_code}"
+            return f"Error: Investing.com blocked (HTTP {response.status_code})"
             
         soup = BeautifulSoup(response.text, 'html.parser')
         
-        # 抓取即時價格元素
-        price_element = soup.select_one('[data-test="instrument-price-last"]')
+        # 嘗試多種可能的點數元素位置 (防止網頁改版)
+        price = None
+        selectors = [
+            '[data-test="instrument-price-last"]',
+            '#last_last',
+            '.main-current-data [data-test="instrument-price-last"]'
+        ]
         
-        if not price_element:
-            return "Error: Price element not found"
+        for selector in selectors:
+            element = soup.select_one(selector)
+            if element:
+                price = element.get_text().replace(',', '').strip()
+                break
+        
+        if not price:
+            return "Error: Could not find price on page"
             
-        # 移除千分號與空白
-        raw_price = price_element.get_text().replace(',', '').strip()
         date_str = datetime.now().strftime('%Y-%m-%d')
-        
-        return f"{date_str},{raw_price}"
+        return f"{date_str},{price}"
         
     except Exception as e:
         return f"Error: {str(e)}"
@@ -56,7 +78,10 @@ def proxy():
     if not code:
         return "Error: Missing code parameter", 400
         
+    # 加入隨機微幅延遲，降低被封鎖機率
     result = get_investing_data(code)
+    
+    # 嚴格回傳純文字格式
     return Response(result, mimetype='text/plain')
 
 if __name__ == '__main__':

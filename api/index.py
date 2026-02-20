@@ -1,4 +1,3 @@
-import os
 from flask import Flask, request, Response
 import cloudscraper
 from bs4 import BeautifulSoup
@@ -22,7 +21,7 @@ TARGET_MAP = {
 
 def get_investing_data(symbol):
     if symbol not in TARGET_MAP:
-        return f"Error: Symbol {symbol} not found in map"
+        return f"Error: Symbol {symbol} not found"
     
     url = f"https://www.investing.com/{TARGET_MAP[symbol]}"
     scraper = cloudscraper.create_scraper(
@@ -36,16 +35,14 @@ def get_investing_data(symbol):
             
         soup = BeautifulSoup(response.text, 'html.parser')
         
-        # 針對 Historical Data 頁面抓取最新價格 (instrument-price-last)
+        # 抓取即時價格元素
         price_element = soup.select_one('[data-test="instrument-price-last"]')
         
         if not price_element:
             return "Error: Price element not found"
             
-        # 移除千分號
-        raw_price = price_element.get_text().replace(',', '')
-        
-        # 取得當前日期 (YYYY-MM-DD)
+        # 移除千分號與空白
+        raw_price = price_element.get_text().replace(',', '').strip()
         date_str = datetime.now().strftime('%Y-%m-%d')
         
         return f"{date_str},{raw_price}"
@@ -56,15 +53,10 @@ def get_investing_data(symbol):
 @app.route('/api')
 def proxy():
     code = request.args.get('code', '').upper()
-    # 接收 date 參數但目前邏輯預設回傳最新值 (符合 date=now 需求)
-    target_date = request.args.get('date', 'now')
-    
     if not code:
         return "Error: Missing code parameter", 400
         
     result = get_investing_data(code)
-    
-    # 輸出格式：日期,數值
     return Response(result, mimetype='text/plain')
 
 if __name__ == '__main__':

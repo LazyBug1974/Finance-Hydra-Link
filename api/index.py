@@ -2,11 +2,10 @@ from flask import Flask, request, Response
 import cloudscraper
 from bs4 import BeautifulSoup
 from datetime import datetime
-import time
 
 app = Flask(__name__)
 
-# 嚴格對齊標的映射表
+# 標的映射表
 TARGET_MAP = {
     "SPXF": "indices/us-spx-500-futures-historical-data",
     "SOX": "indices/phlx-semiconductor-historical-data",
@@ -22,11 +21,11 @@ TARGET_MAP = {
 
 def get_investing_data(symbol):
     if symbol not in TARGET_MAP:
-        return f"Error: Symbol {symbol} not found"
+        return f"Error: {symbol} not supported"
     
     url = f"https://www.investing.com/{TARGET_MAP[symbol]}"
     
-    # 強力模擬真實瀏覽器環境
+    # 建立強力爬蟲實例
     scraper = cloudscraper.create_scraper(
         browser={
             'browser': 'chrome',
@@ -36,54 +35,47 @@ def get_investing_data(symbol):
     )
     
     try:
-        # 額外的真實請求標頭
+        # 模擬真實存取的 Headers
         headers = {
-            'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/119.0.0.0 Safari/537.36',
-            'Accept-Language': 'en-US,en;q=0.9',
-            'Referer': 'https://www.google.com/'
+            'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,image/webp,*/*;q=0.8',
+            'Accept-Language': 'en-US,en;q=0.5',
+            'DNT': '1',
+            'Connection': 'keep-alive',
+            'Upgrade-Insecure-Requests': '1'
         }
         
-        response = scraper.get(url, headers=headers, timeout=20)
+        response = scraper.get(url, headers=headers, timeout=15)
         
         if response.status_code != 200:
-            return f"Error: HTTP {response.status_code} (Blocked)"
+            return f"Error: Investing.com (Status {response.status_code})"
             
         soup = BeautifulSoup(response.text, 'html.parser')
         
-        # 嘗試多個可能的 CSS 選擇器，應對網頁變動
-        price = None
-        selectors = [
-            '[data-test="instrument-price-last"]', 
-            '#last_last',
-            '.main-current-data [data-test="instrument-price-last"]',
-            'span[data-test="instrument-price-last"]'
-        ]
+        # 使用最穩定的數據標籤抓取即時價格
+        price_el = soup.find(attrs={"data-test": "instrument-price-last"})
         
-        for s in selectors:
-            element = soup.select_one(s)
-            if element:
-                price = element.get_text().replace(',', '').strip()
-                break
-        
-        if not price:
-            return "Error: Price element not found"
+        if not price_el:
+            # 備用方案：抓取舊版 id
+            price_el = soup.find(id="last_last")
             
+        if not price_el:
+            return "Error: Element not found"
+            
+        price = price_el.get_text().replace(',', '').strip()
         date_str = datetime.now().strftime('%Y-%m-%d')
+        
         return f"{date_str},{price}"
         
     except Exception as e:
-        return f"Error: {str(e)}"
+        return f"System Error: {str(e)}"
 
 @app.route('/api')
 def proxy():
     code = request.args.get('code', '').upper()
     if not code:
-        return "Error: Missing code parameter", 400
+        return "Error: Code required", 400
         
-    # 執行抓取
     result = get_investing_data(code)
-    
-    # 確保回傳純文字，方便 Google Sheets 讀取
     return Response(result, mimetype='text/plain')
 
 if __name__ == '__main__':

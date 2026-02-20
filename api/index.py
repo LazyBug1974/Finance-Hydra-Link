@@ -5,7 +5,6 @@ from datetime import datetime
 
 app = Flask(__name__)
 
-# 標的映射表
 TARGET_MAP = {
     "SPXF": "indices/us-spx-500-futures-historical-data",
     "SOX": "indices/phlx-semiconductor-historical-data",
@@ -22,33 +21,31 @@ TARGET_MAP = {
 def get_investing_data(symbol):
     url = f"https://www.investing.com/{TARGET_MAP[symbol]}"
     scraper = cloudscraper.create_scraper(browser={'browser': 'chrome', 'platform': 'windows', 'desktop': True})
-    
     try:
-        response = scraper.get(url, timeout=15)
+        # 增加 timeout 防止 Vercel 等太久自動斷線報 500
+        response = scraper.get(url, timeout=10)
         soup = BeautifulSoup(response.text, 'html.parser')
-        price_el = soup.find(attrs={"data-test": "instrument-price-last"})
-        if not price_el: return "Error: Price not found"
         
-        price = price_el.get_text().replace(',', '').strip()
-        return price
+        # 優先抓取最重要的價格標籤
+        price_el = soup.find(attrs={"data-test": "instrument-price-last"})
+        if not price_el:
+            return "Fetching_Error"
+            
+        return price_el.get_text().replace(',', '').strip()
     except Exception as e:
-        return f"Error: {str(e)}"
+        return f"Error_{str(e)[:20]}"
 
 @app.route('/api')
 def proxy():
     code = request.args.get('code', '').upper()
-    # 處理 date 參數：如果沒傳或傳 now，就預設為今天日期
-    date_param = request.args.get('date', 'now').lower()
+    # 處理 date 參數：沒傳、傳 now、或任何值，目前都預設為今天
+    date_param = request.args.get('date', 'now')
     
     if not code or code not in TARGET_MAP:
-        return "Error: Invalid or missing code", 400
-        
-    price = get_investing_data(code)
-    
-    # 無論 date 傳什麼，目前我們都回傳當前日期 + 抓到的價格
-    # 這符合你預設 now 的邏輯
-    current_date = datetime.now().strftime('%Y-%m-%d')
-    return Response(f"{current_date},{price}", mimetype='text/plain')
+        return "Invalid_Code", 400
 
-if __name__ == '__main__':
-    app.run()
+    price = get_investing_data(code)
+    current_date = datetime.now().strftime('%Y-%m-%d')
+    
+    # 輸出格式嚴格對齊：日期,價格
+    return Response(f"{current_date},{price}", mimetype='text/plain')

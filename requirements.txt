@@ -1,5 +1,2 @@
 cloudscraper
-pandas
-beautifulsoup4
-pytz
-lxml
+requests

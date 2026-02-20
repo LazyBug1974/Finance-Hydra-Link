@@ -5,6 +5,7 @@ from datetime import datetime
 
 app = Flask(__name__)
 
+# 標的映射表
 TARGET_MAP = {
     "SPXF": "indices/us-spx-500-futures-historical-data",
     "SOX": "indices/phlx-semiconductor-historical-data",
@@ -22,30 +23,29 @@ def get_investing_data(symbol):
     url = f"https://www.investing.com/{TARGET_MAP[symbol]}"
     scraper = cloudscraper.create_scraper(browser={'browser': 'chrome', 'platform': 'windows', 'desktop': True})
     try:
-        # 增加 timeout 防止 Vercel 等太久自動斷線報 500
         response = scraper.get(url, timeout=10)
         soup = BeautifulSoup(response.text, 'html.parser')
         
-        # 優先抓取最重要的價格標籤
+        # 使用更穩定的選擇器並加入檢查
         price_el = soup.find(attrs={"data-test": "instrument-price-last"})
-        if not price_el:
-            return "Fetching_Error"
-            
-        return price_el.get_text().replace(',', '').strip()
+        if price_el:
+            return price_el.get_text().replace(',', '').strip()
+        return "Fetch_Failed_No_Price"
     except Exception as e:
-        return f"Error_{str(e)[:20]}"
+        return f"Fetch_Error_{str(e)[:15]}"
 
 @app.route('/api')
 def proxy():
     code = request.args.get('code', '').upper()
-    # 處理 date 參數：沒傳、傳 now、或任何值，目前都預設為今天
-    date_param = request.args.get('date', 'now')
+    # 解決你的疑問：如果沒有傳 date，就預設為 'now'
+    date_param = request.args.get('date', 'now').lower()
     
     if not code or code not in TARGET_MAP:
-        return "Invalid_Code", 400
+        return "Error_Invalid_Code", 400
 
     price = get_investing_data(code)
-    current_date = datetime.now().strftime('%Y-%m-%d')
     
-    # 輸出格式嚴格對齊：日期,價格
+    # 統一回傳格式：日期,價格
+    # 無論 date 傳什麼，目前邏輯都先回傳今天日期 (即 now)
+    current_date = datetime.now().strftime('%Y-%m-%d')
     return Response(f"{current_date},{price}", mimetype='text/plain')

@@ -20,63 +20,35 @@ TARGET_MAP = {
 }
 
 def get_investing_data(symbol):
-    if symbol not in TARGET_MAP:
-        return f"Error: {symbol} not supported"
-    
     url = f"https://www.investing.com/{TARGET_MAP[symbol]}"
-    
-    # 建立強力爬蟲實例
-    scraper = cloudscraper.create_scraper(
-        browser={
-            'browser': 'chrome',
-            'platform': 'windows',
-            'desktop': True
-        }
-    )
+    scraper = cloudscraper.create_scraper(browser={'browser': 'chrome', 'platform': 'windows', 'desktop': True})
     
     try:
-        # 模擬真實存取的 Headers
-        headers = {
-            'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,image/webp,*/*;q=0.8',
-            'Accept-Language': 'en-US,en;q=0.5',
-            'DNT': '1',
-            'Connection': 'keep-alive',
-            'Upgrade-Insecure-Requests': '1'
-        }
-        
-        response = scraper.get(url, headers=headers, timeout=15)
-        
-        if response.status_code != 200:
-            return f"Error: Investing.com (Status {response.status_code})"
-            
+        response = scraper.get(url, timeout=15)
         soup = BeautifulSoup(response.text, 'html.parser')
-        
-        # 使用最穩定的數據標籤抓取即時價格
         price_el = soup.find(attrs={"data-test": "instrument-price-last"})
+        if not price_el: return "Error: Price not found"
         
-        if not price_el:
-            # 備用方案：抓取舊版 id
-            price_el = soup.find(id="last_last")
-            
-        if not price_el:
-            return "Error: Element not found"
-            
         price = price_el.get_text().replace(',', '').strip()
-        date_str = datetime.now().strftime('%Y-%m-%d')
-        
-        return f"{date_str},{price}"
-        
+        return price
     except Exception as e:
-        return f"System Error: {str(e)}"
+        return f"Error: {str(e)}"
 
 @app.route('/api')
 def proxy():
     code = request.args.get('code', '').upper()
-    if not code:
-        return "Error: Code required", 400
+    # 處理 date 參數：如果沒傳或傳 now，就預設為今天日期
+    date_param = request.args.get('date', 'now').lower()
+    
+    if not code or code not in TARGET_MAP:
+        return "Error: Invalid or missing code", 400
         
-    result = get_investing_data(code)
-    return Response(result, mimetype='text/plain')
+    price = get_investing_data(code)
+    
+    # 無論 date 傳什麼，目前我們都回傳當前日期 + 抓到的價格
+    # 這符合你預設 now 的邏輯
+    current_date = datetime.now().strftime('%Y-%m-%d')
+    return Response(f"{current_date},{price}", mimetype='text/plain')
 
 if __name__ == '__main__':
-    app.run(debug=True)
+    app.run()

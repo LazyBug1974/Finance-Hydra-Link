@@ -14,16 +14,16 @@
 
 ## 3. 技術規格與邏輯
 ### A. 標的映射表 (Mapping Table)
-- **SPX**: indices/us-spx-500-futures-historical-data
-- **SOX**: indices/phlx-semiconductor-historical-data
-- **XAU**: currencies/xau-usd-historical-data
-- **XAG**: currencies/xag-usd-historical-data
-- **HGH6**: commodities/copper-historical-data
-- **WTI**: commodities/crude-oil-historical-data
-- **US30Y**: rates-bonds/u.s.-30-year-bond-yield-historical-data
-- **US20Y**: rates-bonds/us-20-year-bond-yield-historical-data
-- **US10Y**: rates-bonds/u.s.-10-year-bond-yield-historical-data
-- **US2Y**: rates-bonds/u.s.-2-year-bond-yield-historical-data
+- **美國標普500指數期貨** `SPXF`: indices/us-spx-500-futures-historical-data
+- **費城半導體指數** `SOX`: indices/phlx-semiconductor-historical-data
+- **黃金現貨美元** `XAU`: currencies/xau-usd-historical-data
+- **白銀現貨 美元** `XAG`: currencies/xag-usd-historical-data
+- **銅期貨** `HGH6`: commodities/copper-historical-data
+- **西德州原油** `WTI`: commodities/crude-oil-historical-data
+- **美國 30Y 公債殖利率** `US30Y`: rates-bonds/u.s.-30-year-bond-yield-historical-data
+- **美國 20Y 公債殖利率** `US20Y`: rates-bonds/us-20-year-bond-yield-historical-data
+- **美國 10Y 公債殖利率** `US10Y`: rates-bonds/u.s.-10-year-bond-yield-historical-data
+- **美國 2Y 公債殖利率** `US2Y`: rates-bonds/u.s.-2-year-bond-yield-historical-data
 
 ### B. 核心功能邏輯
 1. **參數處理與抓取路徑**：
@@ -49,4 +49,5 @@
 
 ## 5. 狀態：Approved
 - **核准日期**：2026-02-20
+
 - **核准人**：Ian
